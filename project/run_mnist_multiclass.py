@@ -41,8 +41,9 @@ class Conv2d(minitorch.Module):
         self.bias = RParam(out_channels, 1, 1)
 
     def forward(self, input):
-        # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        # DONE: Implement for Task 4.5.
+        return minitorch.conv2d(input, self.weights.value) + self.bias.value
+        # raise NotImplementedError("Need to implement for Task 4.5")
 
 
 class Network(minitorch.Module):
@@ -67,12 +68,24 @@ class Network(minitorch.Module):
         self.mid = None
         self.out = None
 
-        # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        # DONE: Implement for Task 4.5.
+        self.conv1 = Conv2d(1, 4, 3, 3)
+        self.conv2 = Conv2d(4, 8, 3, 3)
+        self.layer1 = Linear(392, 64)
+        self.layer2 = Linear(64, 10)
+        # raise NotImplementedError("Need to implement for Task 4.5")
 
     def forward(self, x):
-        # TODO: Implement for Task 4.5.
-        raise NotImplementedError("Need to implement for Task 4.5")
+        # DONE: Implement for Task 4.5.
+        self.mid = self.conv1.forward(x).relu()
+        self.out = self.conv2.forward(self.mid).relu()
+        l = self.layer1.forward(
+            minitorch.avgpool2d(self.out, (4, 4)).view(BATCH, 392)
+        ).relu()
+        if self.training:
+            l = minitorch.dropout(l, 0.25)
+        return minitorch.logsoftmax(self.layer2.forward(l), dim=1)
+        # raise NotImplementedError("Need to implement for Task 4.5")
 
 
 def make_mnist(start, stop):
@@ -115,7 +128,6 @@ class ImageTrain:
             for batch_num, example_num in enumerate(
                 range(0, n_training_samples, BATCH)
             ):
-
                 if n_training_samples - example_num <= BATCH:
                     continue
                 y = minitorch.tensor(

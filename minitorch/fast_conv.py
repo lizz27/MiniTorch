@@ -5,15 +5,7 @@ from numba import njit, prange
 
 from .autodiff import Context
 from .tensor import Tensor
-from .tensor_data import (
-    MAX_DIMS,
-    Index,
-    Shape,
-    Strides,
-    broadcast_index,
-    index_to_position,
-    to_index,
-)
+from .tensor_data import Shape, Strides, broadcast_index, index_to_position, to_index
 from .tensor_functions import Function
 
 # This code will JIT compile fast versions your tensor_data functions.
@@ -80,8 +72,39 @@ def _tensor_conv1d(
     s1 = input_strides
     s2 = weight_strides
 
-    # TODO: Implement for Task 4.1.
-    raise NotImplementedError("Need to implement for Task 4.1")
+    # DONE: Implement for Task 4.1.
+    # Iterate through the specified ranges using parallel processing
+    for b in prange(batch_):
+        for o in prange(out_channels_):
+            for j in prange(out_width):
+                total_acc = float(0)
+
+                # Loop through input channels and kernel width
+                for c in prange(in_channels):
+                    for w in prange(kw):
+                        # Calculate positions and indices based on conditions
+                        pos_w = o * s2[0] + c * s2[1] + w * s2[2]
+                        pos_in = (
+                            b * s1[0]
+                            + c * s1[1]
+                            + (j + (-1 if reverse else 1) * w) * s1[2]
+                        )
+                        val = j + (-1 if reverse else 1) * w
+
+                        # Create input_index array
+                        input_index = np.array([b, c, val], dtype=np.int16)
+
+                        # Check conditions and accumulate total_acc
+                        if 0 <= input_index[2] < width or (
+                            reverse and input_index[2] >= 0
+                        ):
+                            total_acc += input[pos_in] * weight[pos_w]
+
+                # Calculate output position and assign total_acc to out
+                out_pos = b * out_strides[0] + o * out_strides[1] + j * out_strides[2]
+                out[out_pos] = total_acc
+
+    # raise NotImplementedError("Need to implement for Task 4.1")
 
 
 tensor_conv1d = njit(parallel=True)(_tensor_conv1d)
@@ -206,8 +229,50 @@ def _tensor_conv2d(
     s10, s11, s12, s13 = s1[0], s1[1], s1[2], s1[3]
     s20, s21, s22, s23 = s2[0], s2[1], s2[2], s2[3]
 
-    # TODO: Implement for Task 4.2.
-    raise NotImplementedError("Need to implement for Task 4.2")
+    # DONE: Implement for Task 4.2.
+    # Implement convolution
+    for i1 in prange(batch_):
+        for i2 in prange(out_channels):
+            for i3 in prange(out_shape[2]):
+                for i4 in prange(out_shape[3]):
+                    out_position = (
+                        i1 * out_strides[0]
+                        + i2 * out_strides[1]
+                        + i3 * out_strides[2]
+                        + i4 * out_strides[3]
+                    )
+                    total_acc = 0.0
+                    for j in range(in_channels):
+                        for h in range(kh):
+                            for s in range(kw):
+                                # Calculate input and weight indices based on conditions
+                                if not reverse:
+                                    cond = (i3 + h) < height and (i4 + s) < width
+                                    input_inner = (
+                                        i1 * s10
+                                        + j * s11
+                                        + (i3 + h) * s12
+                                        + (i4 + s) * s13
+                                    )
+                                else:
+                                    cond = (i3 - h) >= 0 and (i4 - s) >= 0
+                                    input_inner = (
+                                        i1 * s10
+                                        + j * s11
+                                        + (i3 - h) * s12
+                                        + (i4 - s) * s13
+                                    )
+                                # Calculate weight inner index
+                                weight_inner = i2 * s20 + j * s21 + h * s22 + s * s23
+
+                                # Accumulate total_acc based on conditions
+                                if cond:
+                                    total_acc += (
+                                        input[input_inner] * weight[weight_inner]
+                                    )
+
+                    out[out_position] = total_acc
+    # raise NotImplementedError("Need to implement for Task 4.2")
 
 
 tensor_conv2d = njit(parallel=True, fastmath=True)(_tensor_conv2d)
